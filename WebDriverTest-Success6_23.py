@@ -13,8 +13,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 driver = webdriver.Chrome()
 driver.get("https://www.facebook.com")
 
-facebookUsername = "1517078450@qq.com"
-facebookPassword = "qchwang14657"
+facebookUsername = "username" #change
+facebookPassword = "password" #change
 emailFieldID = "email"
 passFieldID = "pass"
 loginButtonXpath = "//input[@value='Log In']"
