@@ -38,14 +38,13 @@ def Nupack_data_scrap(gRNA_seq):
     improved_data = [x.text for x in data_elements][0]
     better_table = improved_data.split("\n")
     better_table = better_table[13:]
-    
+
     final_list =[]
     for line in better_table:
         temp = line.split()
         final_list.append(temp)
-            
+
+    hp_driver.quit()
     end = timer()
-    print ("It takes ",round(end-start)," seconds to finish the Nupack analysis.")
+    print ("It takes ",round(end-start)," seconds to finish the Nupack analysis for the sequence: ", gRNA_seq)
     return final_list
-
-
