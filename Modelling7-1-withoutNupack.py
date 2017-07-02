@@ -135,19 +135,25 @@ def diff_letters(a,b):
 
 def off_target_mismatch(mRNA_seq,gRNA_seq):
     crRNA_seq = gRNA_seq[-gRNA_length:]
+    print(crRNA_seq)
+    
     count = 0
-    for start_pos in range (len(mRNA_seq)-len(crRNA_seq)+1):
+    
+    RNA_complement = ""
+    for num in range(len(crRNA_seq)):
+        base = crRNA_seq[num]
+        index = "UAGC".find(base)
+        complement = "ATCG"[index]
+        RNA_complement += complement
+    print(RNA_complement)
+    
+    for start_pos in range (len(mRNA_seq)-len(crRNA_seq)+1):        
         DNA_seq = mRNA_seq[start_pos:(start_pos+len(crRNA_seq))]
-        RNA_complement = ""
-        for num in range(len(DNA_seq)):
-            base = DNA_seq[num]
-            index = "ATCG".find(base)
-            complement = "UAGC"[index]
-            RNA_complement += complement
-
         #print(RNA_complement)
-        if diff_letters(RNA_complement,crRNA_seq) < off_target_mismatch_threshold:
+        if diff_letters(RNA_complement,DNA_seq) < off_target_mismatch_threshold:
             count +=1
+        if (start_pos%100000 == 0):
+            print("Currently at",start_pos,"th base.")
 
     return count
 
@@ -248,12 +254,14 @@ def RBP_data_scrap(analyze_seq):
     for data_string in final_table:
         temp = data_string.split()
         del temp[3]
-        temp.append(len(temp[2]))
-        temp[1] = int(temp[1])
+        temp.append(len(temp[2]))  # add a column containing length of the motif
+        temp[1] = int(temp[1]) - len(upstream_exon)
         temp[3] = float(temp[3])
         temp[4] = float(temp[4])
+        temp.append((len(temp[2])+temp[1]-1)) # add a colum containing the end position of the motif
         ult_table.append(temp)
 
+    RBP_driver.quit()
     return ult_table
 
 
@@ -297,6 +305,8 @@ def Nupack_data_scrap(gRNA_seq):
 
     hp_driver.quit()
 
+    
+
     end = timer()
     print ("It takes ",round(end-start)," seconds to finish the Nupack analysis for the sequence: ", gRNA_seq)
     return final_list
@@ -310,7 +320,7 @@ def GC_content(gRNA_seq):
 print ("The default setting for this program is not to have a log file.")
 log_choice = input("Would you like to have a log file? ---- press y to answer YES.        ")
 log_judge = (log_choice.lower() == "y")
-print (log_judge)
+#print (log_judge)
 
 
 
@@ -413,9 +423,11 @@ with open("Nupack_data.csv", "r") as nfile:
         gRNA_stats_list.append(row)
 
 
-RBP_data = RBP_data_scrap((upstream_exon+intron_seq+downstream_exon))
-sorted(RBP_data,key=lambda x:x[1]) # Sort the RBP data list based on position value, which is in 2nd columm
-
+RBP_time1 = timer()
+RBP_initial_data = RBP_data_scrap((upstream_exon+intron_seq+downstream_exon))
+RBP_data = sorted(RBP_initial_data,key=lambda x:x[1]) # Sort the RBP data list based on position value, which is in 2nd columm
+RBP_time2 = timer()
+print("The RBP data scrapping takes ", int(RBP_time2-RBP_time1), "second(s) to finish. ")
 
 
 
