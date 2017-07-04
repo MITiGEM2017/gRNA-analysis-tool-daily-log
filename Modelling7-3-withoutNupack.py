@@ -137,9 +137,9 @@ def diff_letters(a,b):
 def off_target_mismatch(mRNA_seq,gRNA_seq):
     crRNA_seq = gRNA_seq[-gRNA_length:]
     print(crRNA_seq)
-    
+
     count = 0
-    
+
     RNA_complement = ""
     for num in range(len(crRNA_seq)):
         base = crRNA_seq[num]
@@ -147,8 +147,8 @@ def off_target_mismatch(mRNA_seq,gRNA_seq):
         complement = "ATCG"[index]
         RNA_complement += complement
     print(RNA_complement)
-    
-    for start_pos in range (len(mRNA_seq)-len(crRNA_seq)+1):        
+
+    for start_pos in range (len(mRNA_seq)-len(crRNA_seq)+1):
         DNA_seq = mRNA_seq[start_pos:(start_pos+len(crRNA_seq))]
         #print(RNA_complement)
         if diff_letters(RNA_complement,DNA_seq) < off_target_mismatch_threshold:
@@ -160,8 +160,8 @@ def off_target_mismatch(mRNA_seq,gRNA_seq):
 
 
 def remove_values_from_list(the_list, val):
-        while val in the_list:
-            the_list.remove(val)
+    while val in the_list:
+        the_list.remove(val)
 
 
 def RBP_data_scrap(analyze_seq):
@@ -267,6 +267,113 @@ def RBP_data_scrap(analyze_seq):
     return ult_table
 
 
+# Function used to extract the dissociation constant for a given RBP name and the data_list
+def extract_RBP_Kd(RBP_Kd_list, RBP_name):
+    for each_RBP in RBP_Kd_list:
+        if(each_RBP[0]==RBP_name):
+            return float(each_RBP[1])
+    return False
+
+
+#RBP score calculation tool
+def RBP_competition_score(site,gRNA_seq,gRNA_list,RBP_data_list,RBP_Kd_list):
+    print(gRNA_seq)
+    start_pos = site[gRNA_list.index(gRNA_seq)]
+    end_pos = start_pos + gRNA_length -1
+    potential_RBP_list = []
+    partial_RBP_list = []
+
+    for row in RBP_data_list:
+        if (row[1]<=end_pos and row[1]>=start_pos):
+            if(row[-1]<=end_pos):
+                potential_RBP_list.append(row)
+            else:
+                partial_RBP_list.append(row)
+        elif (row[-1]>=start_pos and row[1]<start_pos):
+            partial_RBP_list.append(row)
+
+
+    sum_RBP_interference_score = 0  # return value
+
+    # For the score from RBPs that completely bind in the region
+    sum_complete_bind = 0
+    RBP_num_count = 0
+    while RBP_num_count < len(potential_RBP_list):
+        potential_info_list = potential_RBP_list[RBP_num_count]
+        potential_start_pos = potential_info_list[1]
+        potential_RBP_test = True
+        power_count = 0
+        base_score = ((1-potential_info_list[4])**binding_prob_power)*extract_RBP_Kd(RBP_Kd_list,potential_info_list[0])
+        complete_score_list = []
+        complete_score_list.append(base_score)
+        while (potential_RBP_test and (RBP_num_count+power_count+1)<len(potential_RBP_list)):
+            if(potential_RBP_list[RBP_num_count+power_count+1][1] == potential_start_pos):
+                power_count += 1
+                potential_info_list = potential_RBP_list[RBP_num_count+power_count]
+                additional_score = ((1-potential_info_list[4])**binding_prob_power)*extract_RBP_Kd(RBP_Kd_list,potential_info_list[0])  #temporary score
+                complete_score_list.append(additional_score)
+            else:
+                potential_RBP_test = False
+                RBP_num_count += power_count
+
+
+        if len(complete_score_list) > 1:
+            while len(complete_score_list) > 1:
+                minimum_score = min(complete_score_list)
+                sum_complete_bind += minimum_score*(weighted_factor**power_count)
+                power_count -= 1
+                complete_score_list.remove(minimum_score)
+
+        else:
+            sum_complete_bind += base_score
+
+
+        RBP_num_count += 1
+
+    print(sum_complete_bind)
+
+
+
+    # Score for partially bind RBPs in the region
+    sum_partially_bind = 0
+    RBP_num_count = 0
+    while RBP_num_count < len(partial_RBP_list):
+        potential_info_list = partial_RBP_list[RBP_num_count]
+        potential_start_pos = potential_info_list[1]
+        potential_RBP_test = True
+        power_count = 0
+        factor = min((potential_info_list[6]-start_pos+1),(end_pos-potential_info_list[1]+1))/potential_info_list[5]
+        base_score = ((1-potential_info_list[4])**binding_prob_power)*extract_RBP_Kd(RBP_Kd_list,potential_info_list[0])*factor
+        complete_score_list = []
+        complete_score_list.append(base_score)
+        while (potential_RBP_test and (RBP_num_count+power_count+1)<len(partial_RBP_list)):
+            if(partial_RBP_list[RBP_num_count+power_count+1][1] == potential_start_pos):
+                power_count += 1
+                potential_info_list = partial_RBP_list[RBP_num_count+power_count]
+                factor = min((potential_info_list[6]-start_pos+1),(end_pos-potential_info_list[1]+1))/potential_info_list[5]
+                additional_score = ((1-potential_info_list[4])**binding_prob_power)*extract_RBP_Kd(RBP_Kd_list,potential_info_list[0])*factor  #temporary score
+                complete_score_list.append(additional_score)
+            else:
+                potential_RBP_test = False
+                RBP_num_count += power_count
+
+        if len(complete_score_list) > 1:
+            while len(complete_score_list) > 1:
+                minimum_score = min(complete_score_list)
+                sum_partially_bind += minimum_score*(weighted_factor**power_count)
+                power_count -= 1
+                complete_score_list.remove(minimum_score)
+        else:
+            sum_partially_bind += base_score
+
+        RBP_num_count += 1
+
+    print(sum_partially_bind)
+    sum_RBP_interference_score = sum_partially_bind+sum_complete_bind
+
+
+    return sum_RBP_interference_score
+
 
 
 # Nupack
@@ -304,11 +411,11 @@ def Nupack_data_scrap(gRNA_seq):
     for line in better_table:
         temp = line.split()
         final_Nupack_gRNA_list.append(temp)
-    
-    
+
+
     hp_driver.quit()
 
-    
+
 
     end = timer()
     print ("It takes ",round(end-start)," seconds to finish the Nupack analysis for the sequence: ", gRNA_seq)
@@ -322,17 +429,17 @@ def Nupack_gRNA_score(final_Nupack_gRNA_list):
     for each_gRNA_data in final_Nupack_gRNA_list:
         temp_list = each_gRNA_data[-(len(tracrRNA_seq)+gRNA_length):]  # Get the range of -50: ---> all containing individual probabilities of stem loop
         temp_product = 1
-    
+
         for subset in temp_list:
             if (subset[1]=="-1"):
                 prob = float(subset[2])
             else:
                 prob = 0.001
-    
+
             temp_product *= prob
-            
+
         Nupack_gRNA_score_list.append(temp_product)
-    
+
     return Nupack_gRNA_score_list
 
 
@@ -351,7 +458,7 @@ def GC_content(gRNA_seq):
 print ("The default setting for this program is not to have a log file.")
 log_choice = input("Would you like to have a log file? ---- press y to answer YES.        ")
 log_judge = (log_choice.lower() == "y")
-#print (log_judge)
+
 
 
 
@@ -360,11 +467,14 @@ gRNA_length = 22
 intron_seq = intron_input()
 tracrRNA_seq = "CCACCCCAAUAUCGAAGGGGACUAAAAC"
 off_target_mismatch_threshold = 4
-upstream_exon = "ccttcatcaaccacacccag".upper()
-downstream_exon = "ggcttcacctgggaaagagt".upper()
+upstream_exon = "CCTTCATCAACCACACCCAG"
+downstream_exon = "GGCTTCACCTGGGAAAGAGT"
+weighted_factor = 0.4
+binding_prob_power = 2
 
 
 
+# Start the log or not
 if(log_judge):
     print ("The rest of the process would not be shown on the interface. Instead, it will be recorded as message.log in your working directory.")
     old_stdout = sys.stdout
@@ -485,9 +595,10 @@ with open('RBP_binding_affinity_data.csv',"r") as file:
 kd_data_list[0][0] = kd_data_list[0][0][-4:]
 
 
-
-
-
+RBP_competition_score_list = []
+for each_gRNA in gRNA_seq_list:
+    temp_score = RBP_competition_score(gRNA_start_site,each_gRNA, gRNA_seq_list, RBP_data,kd_data_list)
+    RBP_competition_score_list.append(temp_score)
 
 
 
