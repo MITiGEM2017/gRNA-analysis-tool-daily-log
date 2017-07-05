@@ -56,6 +56,7 @@ def intron_input():
                 print("Your input intron sequence is",seq)
                 t=False
                 AUCG_test = False
+    print("\n")
     print("The size of the intron is ",len(seq)," nucleotides.")
     return seq
 
@@ -138,7 +139,7 @@ def off_target_mismatch(mRNA_seq,gRNA_seq):
         if diff_letters(RNA_complement,DNA_seq) < off_target_mismatch_threshold:
             count +=1
             difference_list.append(diff_letters(RNA_complement,DNA_seq))
-            
+
         if (start_pos%100000 == 0):
             print("Currently at",start_pos,"th base.")
 
@@ -394,13 +395,10 @@ def Nupack_data_scrap(gRNA_seq):
         temp = line.split()
         final_Nupack_gRNA_list.append(temp)
 
-
     hp_driver.quit()
 
-
-
     end = timer()
-    print ("It takes ",round(end-start)," seconds to finish the Nupack analysis for the sequence: ", gRNA_seq)
+    #print ("It takes ",round(end-start)," seconds to finish the Nupack analysis for the sequence: ", gRNA_seq)
     return final_Nupack_gRNA_list
 
 
@@ -425,15 +423,13 @@ def Nupack_gRNA_score(final_Nupack_gRNA_list):
     return Nupack_gRNA_score_list
 
 
+
 def gRNA_secondary_structure_score_weight(gRNA_2_score_list):
     maximum_score = max(gRNA_2_score_list)
-    print(math.log(maximum_score,secondary_structure_score_prob_target))
-    print((math.log10(maximum_score)))
-    weight_power = -(math.log(maximum_score,secondary_structure_score_prob_target))*(math.log10(maximum_score))
-    print(weight_power)
+    weight_power = (math.log(maximum_score,secondary_structure_score_prob_target))*(math.log10(maximum_score))
     final_gRNA_secondary_score_list = []
     for gRNA_2_score in gRNA_2_score_list:
-        temp_score = gRNA_2_score**(-math.log10(gRNA_2_score)/weight_power)
+        temp_score = gRNA_2_score**(math.log10(gRNA_2_score)/weight_power)
         final_gRNA_secondary_score_list.append(temp_score)
 
     return final_gRNA_secondary_score_list
@@ -460,17 +456,19 @@ log_judge = (log_choice.lower() == "y")
 
 
 # Global Constant
-gRNA_length = 22
+gRNA_length = 22                             # Used in two functions: RBP_competition_score, off_target_mismatch
 intron_seq = intron_input()
 tracrRNA_seq = "CCACCCCAAUAUCGAAGGGGACUAAAAC"
-off_target_mismatch_threshold = 4
+off_target_mismatch_threshold = 4            # Off-target mismatch nucleotides threshold, used in function: off_target_mismatch
 upstream_exon = "CCTTCATCAACCACACCCAG"
 downstream_exon = "GGCTTCACCTGGGAAAGAGT"
-weighted_factor = 0.4
-binding_prob_power = 2
-GC_threshold_low = 0.4
-GC_threshold_high = 0.7
-secondary_structure_score_prob_target = 0.95 #constant used in function: gRNA_secondary_structure_score_weight  range:[0.949,0.951]
+weighted_factor = 0.4                        # weighted factor, used in RBP interference score calculation. Used in function: RBP_competition_score
+binding_prob_power = 2                       # weighted factor, used in RBP interference score calculation. Used in function: RBP_competition_score
+GC_threshold_low = 0.35                      # GC low threshold for a bad content
+GC_threshold_high = 0.80                     # Above, high threshold
+secondary_structure_score_prob_target = 0.95 # constant used in function: gRNA_secondary_structure_score_weight  range:[0.949,0.951]
+GC_content_penalty_score = 100               # Constant used in the coding part - GC analysis
+direct_repeat_sequence = "CCACCCCAATATCGAAGGGGACTAAAAC"
 
 
 
@@ -483,100 +481,61 @@ if(log_judge):
 
 
 
-#Generate a random mRNA
-mRNA = ""
-for n in range (7000):
-    mRNA += "ATCG"[randint(0,3)]
-
-
 # Where running codes start
 gRNA_start_site = start_site(intron_seq, gRNA_length)
 gRNA_seq_list = gen_gRNA_seq(intron_seq, gRNA_start_site,gRNA_length)
 
+# ----------------------------Separation Line--------------------------------
 
 
+
+# ---------------------------------------------------------------------------
+
+
+
+# ----------------------------Separation Line--------------------------------
+# Nupack data for secondary structure begins here
 gRNA_stats_list = []
-
-
 
 # Following is for a separate run if no Nupack data locally
 """
-t1 = timer()
-gRNA_count = 0
-total_time = 0
-
-
-for gRNA_sequence in gRNA_seq_list:
-    print ("\n")
-    print ("---------------------separation line------------------------")
-    print ("\n")
-
-    s = timer()
-
+print("\n")
+print("Data scraping from Nupack for secondary structure of crRNA in progress:")
+for gRNA_sequence in tqdm(gRNA_seq_list):
     stats_list_secondary_structure = Nupack_data_scrap(gRNA_sequence)
-    print("\n")
-    print("Data fetched for this gRNA is following: ")
-    print ("\n")
-    for reading in stats_list_secondary_structure:
-       print ("Data reading -----> ",reading)
     gRNA_stats_list.append(stats_list_secondary_structure)
-    gRNA_count += 1
-
-    e = timer()
-    time = e - s
-    total_time += time
-    average_time = float(total_time/gRNA_count)
-
-    print ("\n")
-    print (float(100*gRNA_count/(len(gRNA_seq_list)))," % of gRNA has been analyzed.")
-    pending_time = average_time*(len(gRNA_seq_list)-gRNA_count)
-    #print(pending_time)
-    if pending_time > 3600:
-        print ("Pending time: Approximately ",int(pending_time/3600)," hour(s) and ",int((pending_time%3600)/60), " minute(s).")
-    elif pending_time > 60:
-        print ("Pending time: Approximately ", int(pending_time/60)," minute(s) and ", int(pending_time%60)," second(s).")
-    else:
-        print("Pending time: Approximately ", int(pending_time), " seconds.")
-
-
-
-
-t2 = timer()
-print ("\n")
-print ("[Process Reminder] -----> Obataining all data completed.")
-
-total_time = t2-t1
-if total_time>3600:
-    print ("It takes ",int(total_time/3600)," hour(s)", int(total_time%60)," minute(s) in total to finish obtaining data from Nupack. ")
-elif total_time > 60:
-    print ("It takes ",int(total_time/60)," minute(s)", round((total_time%60),1)," seconds in total to finish obtaining data from Nupack. ")
-else:
-    print ("It takes ",total_time," seconds in total to finish obtaining data from Nupack. ")
-#print (gRNA_stats_list)
-
-
 
 with open('Nupack_data.csv','w',newline='') as fp:
     a = csv.writer(fp,delimiter=',')
     a.writerows(gRNA_stats_list)
 """
 
-
+# Nupack Data for gRNA
+# For the following, use it if the file exists. Otherwise, run the above codes to scrap data from Nupack and then save to this file name: Nupack_data.csv
+print("\n")
+print("Extract secondary structure data of crRNA from the csv file in progress:")
 with open("Nupack_data.csv", "r") as nfile:
     nreader = csv.reader(nfile)
-    for row in nreader:
+    for row in tqdm(nreader):
         gRNA_stats_list.append(row)
-
+print("\n")
 for each_gRNA in gRNA_stats_list:
     for data in each_gRNA:
         each_gRNA[each_gRNA.index(data)] = ast.literal_eval(data)
 
 Nupack_gRNA_final_score = Nupack_gRNA_score(gRNA_stats_list)
+# Final weighted score for gRNA's secondary structure - variable: gRNA_2_structure_weighted_score_list
+gRNA_2_structure_weighted_score_list = gRNA_secondary_structure_score_weight(Nupack_gRNA_final_score)
+# ------------------------------Separation Line -----------------------------
 
 
 
+# ---------------------------------------------------------------------------
 
 
+
+# ------------------------------Separation Line -----------------------------
+# RBP data and calculations:
 # RBP data list from RBPmap
 RBP_time1 = timer()
 RBP_initial_data = RBP_data_scrap((upstream_exon+intron_seq+downstream_exon))
@@ -587,15 +546,19 @@ print("The RBP data scrapping takes ", int(RBP_time2-RBP_time1), "second(s) to f
 
 # dissociation constant data for RBPs
 kd_data_list = []
+print("\n")
+print("Extract RBP binding affinity data of crRNA from the csv file in progress:")
 with open('RBP_binding_affinity_data.csv',"r") as file:
     filereader = csv.reader(file)
-    for row in filereader:
+    for row in tqdm(filereader):
         kd_data_list.append(row)
 
 kd_data_list[0][0] = kd_data_list[0][0][-4:]
 
 
 RBP_competition_score_list = []
+print("\n")
+print("RBP-score calculation in progress:")
 for each_gRNA in tqdm(gRNA_seq_list):
     temp_score = RBP_competition_score(gRNA_start_site,each_gRNA, gRNA_seq_list, RBP_data,kd_data_list)
     RBP_competition_score_list.append(temp_score)
@@ -606,12 +569,97 @@ while max(RBP_competition_rearranged_score_list)<1:
     RBP_score_factor_num += 1
     RBP_competition_rearranged_score_list = [each_score*(10**RBP_score_factor_num) for each_score in RBP_competition_score_list]
 
+# Final_score_list for RBP competition: variable name: RBP_competition_rearranged_score_list
 
+# ------------------------------Separation Line -----------------------------
+
+
+
+# ---------------------------------------------------------------------------
+
+
+
+# ------------------------------Separation Line -----------------------------
+# GC content analysis:
 GC_content_score_list = []
-for gRNA in gRNA_seq_list:
-    GC_content_score_list.append(GC_content(gRNA))
+print("\n")
+print("Analysis of GC content is in progress:")
+for gRNA in tqdm(gRNA_seq_list):
+    if GC_content(gRNA) >= GC_threshold_low and GC_content(gRNA) <= GC_threshold_high:
+        GC_content_score_list.append(0)
+    else:
+        GC_content_score_list.append(GC_content_penalty_score)
+# Final Score list for GC content, variable name: GC_content_score_list
+
+# ------------------------------Separation Line -----------------------------
 
 
+
+# ---------------------------------------------------------------------------
+
+
+
+# ------------------------------Separation Line -----------------------------
+# Off target searching begins
+"""
+file = open("human-cDNA.txt","r")
+cDNA_seq = file.readline()
+off_target_data_output = []
+
+for gRNA in tqdm(gRNA_seq_list):
+    start = timer()
+    num_mismatch, mismatch_list = off_target_mismatch(cDNA_seq,gRNA)
+    off_target_gRNA = [num_mismatch, mismatch_list]
+    end = timer()
+    #print("In total:    ", int((end-start)/60),"minute(s) and",(end-start)%60,"second(s) for the gRNA sequence:", gRNA)
+    off_target_data_output.append(off_target_gRNA)
+
+with open('Off_target_data.csv','w',newline='') as fp:
+    a = csv.writer(fp,delimiter=',')
+    a.writerows(off_target_data_output)
+"""
+# ------------------------------Separation Line -----------------------------
+
+
+
+# ---------------------------------------------------------------------------
+
+
+
+# ------------------------------Separation Line -----------------------------
+# pre-structure of crRNA analysis
+"""
+pre_structure_data_list =[]
+print ("\n")
+print ("Data scraping from Nupack for pre-crRNA structure in progress:")
+for gRNA in tqdm(gRNA_seq_list[:6]):
+    gRNA_seq = gRNA[-gRNA_length:]
+    pre_structure = direct_repeat_sequence + gRNA_seq + direct_repeat_sequence
+    pre_structure_data = Nupack_data_scrap(pre_structure)
+    pre_structure_data_list.append(pre_structure_data)
+
+with open('Pre_crRNA_structure_Nupack_data.csv','w',newline='') as fp:
+    a = csv.writer(fp,delimiter=',')
+    a.writerows(pre_structure_data_list)
+"""
+# ------------------------------Separation Line -----------------------------
+
+
+
+# ---------------------------------------------------------------------------
+
+
+
+# ------------------------------Separation Line -----------------------------
+
+# Final overall score calculation:
+# Score lists of different variables:
+# ---> weighted score for gRNA's secondary structure - variable name: gRNA_2_structure_weighted_score_list
+# ---> weighted score for RBP competition            - variable name: RBP_competition_rearranged_score_list
+# ---> penalty score for GC content                  - variable name: GC_content_score_list
+# ---> off-target binding score                      - variable name:
+# ---> score for pre-crRNA strucure                  - variable name:
+final_overall_score = []
 
 # Log recording ends
 if(log_judge):
