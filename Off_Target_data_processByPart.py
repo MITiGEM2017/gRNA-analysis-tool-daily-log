@@ -1,17 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jul  1 21:20:54 2017
+Created on Tue Jul  4 21:09:34 2017
 
 @author: wangq
 """
+import csv
 from timeit import default_timer as timer
+import time
+from tqdm import *
 
+
+off_target_mismatch_threshold = 4
+gRNA_length = 22
 
 def diff_letters(a,b):
     return sum ( a[i] != b[i] for i in range(len(a)) )
 
 def off_target_mismatch(mRNA_seq,gRNA_seq):
     crRNA_seq = gRNA_seq[-gRNA_length:]
+    print("\n")
     print(crRNA_seq)
 
     count = 0
@@ -36,18 +43,20 @@ def off_target_mismatch(mRNA_seq,gRNA_seq):
         else:
             start_pos += (diff-off_target_mismatch_threshold)
 
-        if (start_pos%100000 == 0):
-            print("Currently at",round((start_pos*100/len(mRNA_seq)),2),"% milestone.")
-
     return count, difference_list
 
 file = open("human-cDNA.txt","r")
-#file = open("test.txt","r")
-#mRNA = file.readline()
-off_target_mismatch_threshold = 4
-gRNA_length = 22
-start = timer()
-num_mismatch, mismatch_list = off_target_mismatch(file.readline(),'CCACCCCAAUAUCGAAGGGGACUAAAACGUACAAGUAUGGAGAAUAGAAG')
-off_target_gRNA = [num_mismatch, mismatch_list]
-end = timer()
-print("In total    ", end-start)
+cDNA_seq = file.readline()
+off_target_data_output = []
+
+for gRNA in tqdm(gRNA_seq_list[0:200]):
+    start = timer()
+    num_mismatch, mismatch_list = off_target_mismatch(cDNA_seq,gRNA)
+    off_target_gRNA = [num_mismatch, mismatch_list]
+    end = timer()
+    print("In total:    ", int((end-start)/60),"minute(s) and",(end-start)%60,"second(s) for the gRNA sequence:", gRNA)
+    off_target_data_output.append(off_target_gRNA)
+
+with open('Off_target_data_1.csv','w',newline='') as fp:
+    a = csv.writer(fp,delimiter=',')
+    a.writerows(off_target_data_output)

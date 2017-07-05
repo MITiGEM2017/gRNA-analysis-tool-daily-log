@@ -11,11 +11,12 @@ import sys
 import ast
 import re
 import csv
+import time
 from timeit import default_timer as timer
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from random import randint
-
+from tqdm import *
 
 
 """
@@ -576,7 +577,7 @@ kd_data_list[0][0] = kd_data_list[0][0][-4:]
 
 
 RBP_competition_score_list = []
-for each_gRNA in gRNA_seq_list:
+for each_gRNA in tqdm(gRNA_seq_list):
     temp_score = RBP_competition_score(gRNA_start_site,each_gRNA, gRNA_seq_list, RBP_data,kd_data_list)
     RBP_competition_score_list.append(temp_score)
 
